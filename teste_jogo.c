@@ -4,11 +4,10 @@
 #include <math.h>
 #include "raylib.h"
 
-
-#define ALTURA_TELA 700
+#define ALTURA_TELA 800
 #define LARGURA_TELA 1200
 #define NUM_OBSTACULOS 4
-#define MAX_INPUT_CHARS 40
+#define MAX_INPUT_CHARS 40 
 
 typedef enum GameScreen { MENU, GAMEPLAY, DIFICULDADE_MENU, RANKING } GameScreen;
 
@@ -25,103 +24,120 @@ typedef struct {
 
 typedef struct tipo_score
 {
-    char name[40];
+    char nome[40];
     int score;
 } TIPO_SCORE;
 
 
-float velocidade_jogador = 0, aceleracao_jogador = 0.5;
-int vel_obstaculos = 10, inc_vel_obstaculos = 1;
-int score = 0, score_var = 0;
+float velocidade_jogador = 0, aceleracao_jogador = 0.5; // velocidade e aceleracao com que o jogador cai
+int vel_obstaculos = 10, inc_vel_obstaculos = 1; // velocidade com que os obstaculos vao em direcao ao jogador
+int score = 0, score_var = 0; // score_var temporario para fazer o calculo do incremento de dificuldade
 int gap = 300, dec_gap = 5;
 int largura_obstaculos = 100;
-//int altura_obstaculos = 50;
-//int altura_obstaculos;
-int distanciaProximoObstaculo = 400;
+int distanciaProximoObstaculo = 400; // distanciia entre os obstaculos
 int dif_max_altura = 50, inc_dif_max_altura;
 int score_threshold = 400;
-//int altura_inicial;
-int dificuldade = 1;
-//int game_over = 0;
-GameScreen tela_atual = MENU;
+int dificuldade = 1; // 0 - facil, 1 - medio, 2 - dificil, o jogo comeca no medio
+GameScreen tela_atual = MENU; // Indica que o jogo comeca na tela do Menu
 
-
+// Função para ler o arquivo txt contendo o ranking
 void LerRanking(TIPO_SCORE ranking[5]){
     FILE *file;
     file = fopen("ranking.txt", "r");
     char line[40];
     
     for (int i = 0; i < 5; i++) {
+        // Lendo as linhas com nome
         if (fgets(line, sizeof(line), file) != NULL) {
-            line[strcspn(line, "\n")] = '\0';
-            // Remove the newline character
-            strncpy(ranking[i].name, line, sizeof(ranking[i].name) - 1);
-            ranking[i].name[sizeof(ranking[i].name) - 1] = '\0';  // Ensure null-termination
+            // Achando o '\n' e trocando por '\0'
+            for (int j = 0; j < sizeof(line); j++) {
+                if (line[j] == '\n') {
+                    line[j] = '\0';
+                    break;
+                }
+            }
 
-            // Read the score and handle newline characters
+            // copiando o nome no array de rankings 
+            strcpy(ranking[i].nome, line);
+            
+            // Lendo as linhas com score
             if (fgets(line, sizeof(line), file) != NULL) {
+                // Armazenando o score no array
                 sscanf(line, "%d", &ranking[i].score);
             } 
         }
     }
     fclose(file);
-    
-    // ordenar
+    // Ordenar o ranking
     OrdenarRanking(ranking);
 }
+// Funcao para ordenar o ranking em order decrescente com base nos scores
 void OrdenarRanking(TIPO_SCORE ranking[5]){
+    // Loop exterior iterando com base no tamanho do array
     for (int i = 0; i < 5 - 1; i++) {
+        // Loop interior para cada elemento no array, menos os ultimos i elementos
         for (int j = 0; j < 5 - i - 1; j++) {
+            // Comparando o score de j com o proximo elemento
             if (ranking[j].score < ranking[j + 1].score) {
-                // Swap the entries
+                // Trocar os elementos se o score do elemento atual for menor que o do proximo elemento
                 TIPO_SCORE temp = ranking[j];
                 ranking[j] = ranking[j + 1];
                 ranking[j + 1] = temp;
+                // Com isso os maiores valores de score vão ficar em primeiro
             }
         }
     }
-    
 }
 
-void AtualizarRanking(TIPO_SCORE ranking[5], char name[]){
+// Funcao para verificar se um score é maior que algum score do ranking, atualizar o ranking, ordenar e escrever no arquivo txt
+void AtualizarRanking(TIPO_SCORE ranking[5], char nome[]){
     int menor_score = INT_MAX, idx_menor_score;
+    
+    
+    // Achar o menor score em Ranking e salvando o seu indice
     for(int i=0; i < 5; i++){
         if (ranking[i].score < menor_score){
             menor_score = ranking[i].score;
             idx_menor_score = i;
         }
-        
     }
     
     TIPO_SCORE jogador;
-    strcpy(jogador.name, name);
+    // Armazenar o nome e score do jogador em uma estrutura
+    strcpy(jogador.nome, nome);
     jogador.score = score;
+    // Substituir o menor score
     ranking[idx_menor_score] = jogador;
-
+    // Ordenar o ranking
     OrdenarRanking(ranking);
-
+    // Escrever o novo ranking no arquivo txt
     EscreverRanking(ranking);
 }
 
+// Função para escrever o ranking passado como argumento no arquivo ranking.txt
 void EscreverRanking(TIPO_SCORE ranking[5]){
     FILE *file;
     file = fopen("ranking.txt", "w");
+    
     for (int i = 0; i<5; i++){
-        
-        fprintf(file, "%s\n", ranking[i].name);
+        // Escrevendo primeiro o nome e depois o score
+        fprintf(file, "%s\n", ranking[i].nome);
         fprintf(file, "%d\n", ranking[i].score);
     }
-    fclose(file);
     
+    fclose(file);
 }
 
+// Funcao para verificar se o mouse esta em cima de um botao (retangulo), os argumentos passados são a posicao e tamanho do retangulo
 bool MouseEstaSobreBotao(Vector2 posicao, Vector2 tamanho) {
     Vector2 mouse = GetMousePosition();
     return CheckCollisionPointRec(mouse, (Rectangle){posicao.x, posicao.y, tamanho.x, tamanho.y});
 }
 
+// Função para ler os arquivos binarios e ler os parametros de dificuldade
 void LerDificuldade(int dificuldade){
     FILE *file;
+    // dificuldade padrao é 1 (médio)
     switch (dificuldade){
         case 0: 
             file = fopen("easy.bin", "rb");
@@ -138,26 +154,19 @@ void LerDificuldade(int dificuldade){
     fclose(file);
 }
 
-int CarregarObstaculos(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[], int altura_obstaculos){
-    altura_obstaculos = GetRandomValue(100, 600);//GetRandomValue(10, ALTURA_TELA - gap - 10);
-    //FILE *file;
-        
-    //file = fopen("data.txt", "w");
+int CarregarObstaculos(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[]){
+    int altura_obstaculos = GetRandomValue(500, 700);//GetRandomValue(10, ALTURA_TELA - gap - 10);
+
     for (int i = 0; i < NUM_OBSTACULOS; i++) {
         /////////////////////////////////////////////////////// FIX THIS
         altura_obstaculos = GetRandomValue(altura_obstaculos - dif_max_altura, altura_obstaculos + dif_max_altura);
         
-        if (altura_obstaculos >= ALTURA_TELA - gap - 50){
-            altura_obstaculos = ALTURA_TELA - gap - 50;//GetRandomValue(ALTURA_TELA - gap - dif_max_altura - 10, ALTURA_TELA - gap - 10);
+        if (altura_obstaculos >= ALTURA_TELA - gap - 100){
+            altura_obstaculos = ALTURA_TELA - gap - 100;//GetRandomValue(ALTURA_TELA - gap - dif_max_altura - 10, ALTURA_TELA - gap - 10);
         }
         else if (altura_obstaculos <= 50){
             altura_obstaculos = 50;//GetRandomValue(10, altura_obstaculos + dif_max_altura);
         }
-
-        
-        
-        //fprintf(file, "%d\n", altura_obstaculos);
-        ///////////////////////////////////////////////////////
 
         obstaculos_cima[i].posicao.x = LARGURA_TELA + i * distanciaProximoObstaculo;
         obstaculos_cima[i].posicao.y = 0;
@@ -170,50 +179,49 @@ int CarregarObstaculos(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[]
         obstaculos_baixo[i].tamanho.y = altura_obstaculos;
         obstaculos_baixo[i].passou = 0;
     }
-    //fclose(file);
     
     return altura_obstaculos;
 }
 
+// Funcao para atualizar a posicao e velocidade do jogador e para colocar a imagem do passaro no jogador
 void AtualizarJogador(float *velocidade_jogador, float aceleracao_jogador, Jogador *jogador, Texture2D textura) {
+    // Desenha a hitbox do jogador (circulo)
     DrawCircleV((*jogador).posicao, (*jogador).tamanho, BLANK);
-    BeginShaderMode(LoadShader(0, TextFormat("resources/shaders/circle_mask.fs", LARGURA_TELA, ALTURA_TELA)));
-    //DrawTexture(textura, (*jogador).posicao.x - textura.width / 2, (*jogador).posicao.y - textura.height / 2, WHITE);
+    // Calcula o tamanho que a imagem tem que ter com base no tamanho do circulo determinado por jogador.tamanho
     float scaleFactor = 2.5f * (*jogador).tamanho / fmax(textura.width, textura.height);
+    // Atualizar a posicao da imagem (textura) passada como argumento com base na posicao do jogador
     DrawTextureEx(textura, (Vector2){(*jogador).posicao.x - (*jogador).tamanho, (*jogador).posicao.y - (*jogador).tamanho}, 0, scaleFactor, WHITE);
-    EndShaderMode();
+    ////EndShaderMode();
+    
+    // Se o botao espaco for apertado, o jogador é impulsionado para cima
     if (IsKeyPressed(KEY_SPACE)) {
         *velocidade_jogador = -10;
     }
-
+    // Atualizar a velocidade e poosicao do jogador
     *velocidade_jogador += aceleracao_jogador;
     (*jogador).posicao.y += *velocidade_jogador;
 
 }
-
+// Funcao para incrementar a dificuldade quando o score passar do score_threshold **** Adicionar incremento de dif_max_altura
 void AumentarDificuldade(){
-    if (score_var / score_threshold >= 1){
-        vel_obstaculos += inc_vel_obstaculos;
+    // score_var é uma variavel temporaria que é incrementada igualmente em relacao a score
+    if (score_var >= score_threshold){
+        vel_obstaculos += inc_vel_obstaculos; // incremento da velocidade do cenario
         
         if (gap - dec_gap >= 100){
-            gap -= dec_gap;
+            gap -= dec_gap;        // gap entre obstaculos diminui até 100, distancia minima para continuar jogavel
         }
-            score_var = 0;
+        if (dif_max_altura <= 500){
+            dif_max_altura += inc_dif_max_altura; // diferena maxima de altura aumenta até 500, distancia maxima para continuar jogavel
+        }
+        
+        score_var = 0;
+        // score_var é zerado toda vez que o score passar do score_threshold
     }  
 }
 
-int AtualizarJogo(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[], Jogador *jogador, GameScreen *currentScreen, int altura_obstaculos, TIPO_SCORE ranking[5]){
+int AtualizarJogo(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[], Jogador *jogador, GameScreen *currentScreen, int altura_obstaculos, Texture2D textura_cano, Texture2D textura_cano_invertido){
     
-    
-    Image cano = LoadImage("fornow.png");
-    Texture2D textura_cano = LoadTextureFromImage(cano);
-    ImageFlipVertical(&cano);
-    Texture2D textura_cano_invertido = LoadTextureFromImage(cano);
-    UnloadImage(cano);
-
-    //FILE *file;
-        
-    //file = fopen("data1.txt", "a");
     for (int i = 0; i < NUM_OBSTACULOS; i++) {
         
         obstaculos_cima[i].posicao.x -= vel_obstaculos;
@@ -226,19 +234,15 @@ int AtualizarJogo(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[], Jog
             obstaculos_baixo[i].passou = 1;
         }
         
-        /////////////////////////////////////////////////////// FIX THIS
+        /////////////////////////////////////////////////////// TODO
         altura_obstaculos = GetRandomValue(altura_obstaculos - dif_max_altura, altura_obstaculos + dif_max_altura);
-        //altura_obstaculos = GetRandomValue(*altura_inicial - dif_max_altura, *altura_inicial + dif_max_altura);
         
-        if (altura_obstaculos >= ALTURA_TELA - gap - 50){
-            altura_obstaculos = ALTURA_TELA - gap - 50;//GetRandomValue(ALTURA_TELA - gap - dif_max_altura - 10, ALTURA_TELA - gap - 10);
+        if (altura_obstaculos >= ALTURA_TELA - gap - 100){
+            altura_obstaculos = ALTURA_TELA - gap - 100;
         }
         else if (altura_obstaculos <= 50){
-            altura_obstaculos = 50;//GetRandomValue(10, altura_obstaculos + dif_max_altura);
+            altura_obstaculos = 50;
         }
-        
-        
-        
         ///////////////////////////////////////////////////////
         
             // Check if obstacle went off the screen, reset its position and reset passou flag
@@ -253,304 +257,330 @@ int AtualizarJogo(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[], Jog
 
             obstaculos_baixo[i].passou = 0;
         }
-        //fprintf(file, "Posicao: %d, Altura Obstaculo: %d, Altura real: %d\n", (int)obstaculos_baixo[i].posicao.y, (int)obstaculos_baixo[i].tamanho.y, altura_obstaculos);
             
         if (CheckCollisionCircleRec((*jogador).posicao, (*jogador).tamanho, (Rectangle){obstaculos_baixo[i].posicao.x, obstaculos_baixo[i].posicao.y, obstaculos_baixo[i].tamanho.x, obstaculos_baixo[i].tamanho.y}) ||
             CheckCollisionCircleRec((*jogador).posicao, (*jogador).tamanho, (Rectangle){obstaculos_cima[i].posicao.x, obstaculos_cima[i].posicao.y, obstaculos_cima[i].tamanho.x, obstaculos_cima[i].tamanho.y})) {
             DrawText(TextFormat("Collision!"), 500, 500, 40, BLACK); 
-            //score = 0;
-           // game_over = 1;
             tela_atual = MENU;
             return 1;
         }
         
         if((*jogador).posicao.y >= ALTURA_TELA){
-            //score = 0;
-            //game_over = 1;
             tela_atual = MENU;
             return 1;
         }
 
         DrawRectangleV(obstaculos_cima[i].posicao, obstaculos_cima[i].tamanho, BLANK);
-        DrawTexture(textura_cano_invertido, obstaculos_cima[i].posicao.x, obstaculos_cima[i].tamanho.y - ALTURA_TELA, WHITE);
+        DrawTexture(textura_cano_invertido, obstaculos_cima[i].posicao.x, obstaculos_cima[i].tamanho.y - ALTURA_TELA+100, WHITE);
         DrawRectangleV(obstaculos_baixo[i].posicao, obstaculos_baixo[i].tamanho, BLANK);  
         DrawTexture(textura_cano, obstaculos_baixo[i].posicao.x, obstaculos_baixo[i].posicao.y, WHITE);
     }
-    //fclose(file);
     return 0;
 }
 
 int main() {
 
     InitWindow(LARGURA_TELA, ALTURA_TELA, "Flappy Bird");
-    SetTargetFPS(60);
+    SetWindowPosition((GetMonitorWidth(0) - LARGURA_TELA)/2, 10); // posiciona a janela para melhor visualização do jogo
+    SetTargetFPS(60); // 60 frames por segundo
 
-    char dificuldade_selecionada[10] = "Medio";
-    Jogador jogador = {(Vector2){100, 300}, 30};
+    char dificuldade_selecionada[10] = "Medio"; // string padrão de display no menu de dificuldade
+    Jogador jogador = {(Vector2){100, 300}, 20}; // inicia o jogador em x=100, y=300 e tamanho (raio) = 20
 
-    Obstaculo obstaculos_baixo[NUM_OBSTACULOS];
-    Obstaculo obstaculos_cima[NUM_OBSTACULOS];
+    Obstaculo obstaculos_baixo[NUM_OBSTACULOS]; // cria o array que armazenará os obstaculos de baixo
+    Obstaculo obstaculos_cima[NUM_OBSTACULOS]; // cria o array que armazenará os obstaculos de cima
     
-    int altura_inicial = GetRandomValue(10, ALTURA_TELA - gap);
+    //int altura_inicial = GetRandomValue(10, ALTURA_TELA - gap); // Gerando uma altura randomica inicial
+    int altura_inicial; // Variavel inicial para armazenar o valor retornado por CarregarObstaculos
 
-    char name[MAX_INPUT_CHARS + 1] = "\0";
-    int letterCount = 0;
+    char nome[MAX_INPUT_CHARS + 1] = "\0"; // inicializa o array que ira armazenar o nome do jogador
+    int count_letras = 0; // contador de caracteres digitas no input do nome
     
-    Rectangle textBox = { LARGURA_TELA-500, ALTURA_TELA - 50, 490, 25 };
-    bool mouseOnText = false;
+    Rectangle BoxInputNome = { LARGURA_TELA-500, 10, 490, 25 }; // inicialiazao do retangulo do input do username
+    bool mouseNoInput = false;
 
-    int framesCounter = 0;
+    int framesCounter = 0; // variavel para controlar a frequência que o '_' pisca
     
-    TIPO_SCORE ranking[5];
-    LerRanking(ranking);
+    TIPO_SCORE ranking[5]; // inicializando o array de scores
+    LerRanking(ranking);   // lendo o ranking.txt e armazenando no array
     
-    Image backgroundImage = LoadImage("achoaqui.png");
+    // Carregando o background do jogo
+    Image backgroundImage = LoadImage("achoaqui800.png");
     Texture2D backgroundTexture = LoadTextureFromImage(backgroundImage);
     UnloadImage(backgroundImage);
-    float backgroundX = 0.0f;
-    float backgroundScrollSpeed = 3.0f;
-    Image passaro = LoadImage("yellowbird.png");
-    Texture2D textura_passaro = LoadTextureFromImage(passaro);
+    // Definindo a posição inicial do background e a velocidade dele
+    float backgroundX = 0;
+    float backgroundScrollSpeed = 3.0;
+
+    Image passaro = LoadImage("yellowbird.png");                //
+    Texture2D textura_passaro = LoadTextureFromImage(passaro);  // Carregando o png do passaro
+    UnloadImage(passaro);                                       //                    
+    Image cano = LoadImage("fornow.png");                       // 
+    Texture2D textura_cano = LoadTextureFromImage(cano);        // Carregando o png do obstaculo de baixo
+    ImageFlipVertical(&cano);                                   // Inverter a imagem para obter o obstaculo de cima                   
+    Texture2D textura_cano_invertido = LoadTextureFromImage(cano);
+    UnloadImage(cano);
+    Image logo = LoadImage("logo.png");                         
+    Texture2D textura_logo = LoadTextureFromImage(logo);        //  Carregando o logo do jogo para o menu
+    UnloadImage(logo);
     
 
     while (!WindowShouldClose()) {
         BeginDrawing();
-        
+        // Atualizar a posicao do background
         backgroundX -= backgroundScrollSpeed;
+        // Resetar a parte do background quando ela sair da tela
         if (backgroundX <= -backgroundTexture.width) {
             backgroundX = 0;
         }
-        DrawTextureEx(backgroundTexture, (Vector2){backgroundX, 0}, 0.0f, 1.0f, WHITE);
-        DrawTextureEx(backgroundTexture, (Vector2){backgroundX + backgroundTexture.width, 0}, 0.0f, 1.0f, WHITE);
+        
+        //DrawTextureEx(backgroundTexture, (Vector2){backgroundX, 0}, 0, 1, WHITE); // Desenhando o background
+        DrawTexture(backgroundTexture, backgroundX, 0, WHITE);
+        DrawTexture(backgroundTexture, backgroundX + backgroundTexture.width, 0, WHITE);
+        //DrawTextureEx(backgroundTexture, (Vector2){backgroundX + backgroundTexture.width, 0}, 0, 1, WHITE); 
         
 
         switch (tela_atual) {
             
             case MENU: {
-                DrawText("Flappy Bird", 400, 200, 40, BLACK);
-                
-                //score = 0;
-                //score_var = 0;
+                DrawTexture(textura_logo, LARGURA_TELA/2-200, 200, WHITE); // Logo flappyinf
+            
                 // Botao Jogar
-                
-                if (MouseEstaSobreBotao((Vector2){400, 300}, (Vector2){200, 50})) {
-                    DrawRectangle(400, 300, 200, 50, GRAY);
+                if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 90, ALTURA_TELA/2 - 90}, (Vector2){200, 50})) {
+                    DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2-50, 200, 50, LIME);
                     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        jogador.posicao.y = 300;
-                        velocidade_jogador = 0;
-                        LerDificuldade(dificuldade);
-                        altura_inicial = CarregarObstaculos(obstaculos_baixo, obstaculos_cima, altura_inicial);
-                        tela_atual = GAMEPLAY;
+                        jogador.posicao.y = 300; // reseta a posicao do jogador
+                        velocidade_jogador = 0;  // reseta a velocidade
+                        LerDificuldade(dificuldade); // Lê o arquivo bin conforme a dificuldade selecionada
+                        // gera os obstaculos e retorna a altura que será passada como argumento para AtualizarJogo
+                        altura_inicial = CarregarObstaculos(obstaculos_baixo, obstaculos_cima); 
+                        tela_atual = GAMEPLAY; // muda a tela do menu para o jogo em si
                     }
                 } else {
-                    DrawRectangle(400, 300, 200, 50, LIGHTGRAY);
+                    DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2-50, 200, 50, GREEN);
                 }
-                DrawText("Jogar", 450, 315, 20, BLACK);
+                DrawText("Jogar", LARGURA_TELA/2 - 50, ALTURA_TELA/2-35, 20, WHITE);
+
 
 
                // Botao dificuldade
-               if (MouseEstaSobreBotao((Vector2){400, 360}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 360, 200, 50, GRAY);
+               if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 100, ALTURA_TELA/2 - 30}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 +10, 200, 50, LIME);
                     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        tela_atual = DIFICULDADE_MENU;
+                        tela_atual = DIFICULDADE_MENU; // muda para a tela do menu de dificuldade
                     }
                }
                else {
-                DrawRectangle(400, 360, 200, 50, LIGHTGRAY);
+                DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 10, 200, 50, GREEN);
                 }
-                DrawText("Dificuldade", 450, 375, 20, BLACK);
+                DrawText("Dificuldade", LARGURA_TELA/2 - 50, ALTURA_TELA/2 + 25, 20, WHITE);
                 
                 // Botao Ranking
-               if (MouseEstaSobreBotao((Vector2){400, 420}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 420, 200, 50, GRAY);
+               if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 30}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 70, 200, 50, LIME);
                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                       
-                       tela_atual = RANKING;
+                       tela_atual = RANKING; // muda para a tela do scoreboard
                    }    
-       
                }
                else {
-                DrawRectangle(400, 420, 200, 50, LIGHTGRAY);
+                DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 70, 200, 50, GREEN);
                 }
-                DrawText("Ranking", 450, 435, 20, BLACK);
+                DrawText("Ranking", LARGURA_TELA/2 - 50, ALTURA_TELA/2 + 85, 20, WHITE);
                 
                 // Button Sair
-               if (MouseEstaSobreBotao((Vector2){400, 480}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 480, 200, 50, GRAY);
+               if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 90}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 130, 200, 50, LIME);
                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                       CloseWindow();
+                       CloseWindow(); // fecha o jogo
                    }
                }
                 else {
-                DrawRectangle(400, 480, 200, 50, LIGHTGRAY);
+                DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 130, 200, 50, GREEN);
                 }
-                DrawText("Sair do Jogo", 450, 495, 20, BLACK);
+                DrawText("Sair do Jogo", LARGURA_TELA/2 - 50, ALTURA_TELA/2 + 145, 20, WHITE);
                 
                 
-                if (CheckCollisionPointRec(GetMousePosition(), textBox)) mouseOnText = true;
-                else mouseOnText = false;
+                // Checa se o ponteiro do mouse esta sobre a caixa de input do nome
+                if (CheckCollisionPointRec(GetMousePosition(), BoxInputNome)){
+                    mouseNoInput = true;
+                }
+                else {
+                    mouseNoInput = false;
+                }
 
-                if (mouseOnText)
+                if (mouseNoInput) // Se o mouse estiver em cima da caixa de input:
                 {
-                    // Set the window's cursor to the I-Beam
+                    // Cursor vira 'I'
                     SetMouseCursor(MOUSE_CURSOR_IBEAM);
 
-                    // Get char pressed (unicode character) on the queue
-                    int key = GetCharPressed();
-
-                    // Check if more characters have been pressed on the same frame
-                    while (key > 0)
+                    // Captura a tecla digitada, se for mais de uma em 1 frame, adiciona em uma fila
+                    int tecla = GetCharPressed();
+                    
+                    // Checa se mais caracteres foram digitados no mesmo frame
+                    while (tecla > 0) // quando nao tiver mais caracteres na fila, tecla = 0
                     {
-                        // NOTE: Only allow keys in range [32..125]
-                        if ((key >= 32) && (key <= 125) && (letterCount < MAX_INPUT_CHARS))
+                        // Limita teclas entre 32 e 125 em unicode e limita a quantidade de caracteres no username
+                        if ((tecla >= 32) && (tecla <= 125) && (count_letras < MAX_INPUT_CHARS))
                         {
-                            name[letterCount] = (char)key;
-                            name[letterCount+1] = '\0'; // Add null terminator at the end of the string.
-                            letterCount++;
+                            nome[count_letras] = (char)tecla; // Adiciona o caracter na string do nome do jogador
+                            nome[count_letras+1] = '\0'; // Adiciona o finalizador de string 
+                            count_letras++;              // conta a quantidade de caracteres no momento 
                         }
 
-                        key = GetCharPressed();  // Check next character in the queue
+                        tecla = GetCharPressed();  // Checa o proximo caractere na fila
                     }
 
-                    if (IsKeyPressed(KEY_BACKSPACE))
+                    if (IsKeyPressed(KEY_BACKSPACE)) // Checa se o usuaria esta apagando caracteres
                     {
-                        letterCount--;
-                        if (letterCount < 0) letterCount = 0;
-                        name[letterCount] = '\0';
+                        count_letras--; // numero de caracteres no username diminui
+                        
+                        if (count_letras < 0){
+                            count_letras = 0;  // quando todos caracteres forem apagados, nao há mais o que apagar
+                        }
+                        nome[count_letras] = '\0';
                     }
                 }
-                else SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+                else SetMouseCursor(MOUSE_CURSOR_DEFAULT); // Se o mouse nao estivera acima do input, cursor fica normal
 
-                if (mouseOnText) framesCounter++;
-                else framesCounter = 0;
+
+                // Quando o mouse estiver em cima da caixa do input o contador será incrementado 60 vezes por segundo
+                if (mouseNoInput){
+                    framesCounter++; 
+                }
+                else {
+                    framesCounter = 0; // reinicia quando o mouse sai do retangulo
+                }
                 
-                DrawRectangleRec(textBox, LIGHTGRAY);
-                if (mouseOnText) DrawRectangleLines((int)textBox.x, (int)textBox.y, (int)textBox.width, (int)textBox.height, RED);
-                else DrawRectangleLines((int)textBox.x, (int)textBox.y, (int)textBox.width, (int)textBox.height, DARKGRAY);
+                // Se o mouse estiver em cima do input a caixa fica verde, se não fica branca
+                if (mouseNoInput){ 
+                    DrawRectangle(BoxInputNome.x, BoxInputNome.y+40, BoxInputNome.width, BoxInputNome.height, GREEN);
+                }
+                else {
+                    DrawRectangle(BoxInputNome.x, BoxInputNome.y+40, BoxInputNome.width, BoxInputNome.height, WHITE);
+                }
+                
+                // Contorno da caixa de input
+                DrawRectangleLines(BoxInputNome.x, BoxInputNome.y+40, BoxInputNome.width, BoxInputNome.height, GRAY);
 
-                DrawText(name, (int)textBox.x + 5, (int)textBox.y + 5, 20, MAROON);
-
-                //DrawText(TextFormat("INPUT CHARS: %i/%i", letterCount, MAX_INPUT_CHARS), 315, 250, 20, DARKGRAY);
+                // Display do nome que está sendo digitado e armazenado na string nome
+                DrawText(nome, BoxInputNome.x + 5, BoxInputNome.y + 45, 20, BLACK);
                
-                if (mouseOnText)
-                {
-                    if (letterCount < MAX_INPUT_CHARS)
-                    {
-                        // Draw blinking underscore char
-                        if (((framesCounter/20)%2) == 0) DrawText("_", (int)textBox.x + 8 + MeasureText(name, 20), (int)textBox.y+3, 25, MAROON);
+                /// Se mouse estiver em cima do input e houver caracteres disponiveis, '_' irá piscar
+                if (mouseNoInput){
+                    if (count_letras < MAX_INPUT_CHARS){
+                        //(framesCounter/20)%2) == 0 será verdade a cada 20 frames que passa, essa condição permite regular a freq. do pisca
+                        if (((framesCounter/20)%2) == 0) DrawText("_", BoxInputNome.x + 8 + MeasureText(nome, 20), BoxInputNome.y+43, 25, BLACK);
+                        // MeasureText retorna a quantidade de pixeis que uma string ocupa de acordo com o tamnho da fonte
                     }
-                    //else DrawText("Press BACKSPACE to delete chars...", 230, 300, 20, GRAY);
-                }
-                
-                
-                
-                
+                }   
             } break;
             
             case DIFICULDADE_MENU: {
                 
-                DrawText(TextFormat("Dificuldade: %s", dificuldade_selecionada), 400, 200, 40, BLACK);
+                DrawText(TextFormat("Dificuldade: %s", dificuldade_selecionada), LARGURA_TELA/2 - 150, 200, 40, BLACK);
                 //Botao facil
-                if (MouseEstaSobreBotao((Vector2){400, 300}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 300, 200, 50, GRAY);
+                if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 100, ALTURA_TELA/2 -90}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 - 50, 200, 50, LIME);
                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        dificuldade = 0;
-                        DrawRectangle(400, 300, 200, 50, GRAY);
-                        strcpy(dificuldade_selecionada, "Facil");
-                      //  DrawText(TextFormat("Dificuldade: %s", dificuldade_selecionada), 400, 200, 40, BLACK);
+                        dificuldade = 0; // Se mouse for apertado, a dificuldade mudara para fácil
+                        DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 - 50, 200, 50, LIME);
+                        strcpy(dificuldade_selecionada, "Facil"); // Copia "Facil" para a string de display do menu
                    }
                 }
                 else {
-                    DrawRectangle(400, 300, 200, 50, LIGHTGRAY);
+                    DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 - 50, 200, 50, GREEN);
                     }
-                    DrawText("Facil", 450, 315, 20, BLACK);
+                    DrawText("Facil", LARGURA_TELA/2 - 50, ALTURA_TELA/2 - 35, 20, WHITE);
                 
                 //Botao medio
-                if (MouseEstaSobreBotao((Vector2){400, 360}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 360, 200, 50, GRAY);
+                if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 100, ALTURA_TELA/2 - 30}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 10, 200, 50, LIME);
                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        dificuldade = 1;
-                        DrawRectangle(400, 360, 200, 50, GRAY);
-                        strcpy(dificuldade_selecionada, "Medio");
-                       // DrawText(TextFormat("Dificuldade: %s", dificuldade_selecionada), 400, 200, 40, BLACK);
+                        dificuldade = 1; // Se mouse for apertado, a dificuldade mudara para médio (padrao)
+                        DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 10, 200, 50, GREEN);
+                        strcpy(dificuldade_selecionada, "Medio"); // Copia "Medio" para a string de display do menu
                    }
                 }
                 else {
-                    DrawRectangle(400, 360, 200, 50, LIGHTGRAY);
+                    DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 10, 200, 50, GREEN);
                     }
-                    DrawText("Medio", 450, 375, 20, BLACK);
+                    DrawText("Medio", LARGURA_TELA/2 - 50, ALTURA_TELA/2 + 25, 20, WHITE);
                 
                 //Botao dificil
-                if (MouseEstaSobreBotao((Vector2){400, 420}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 420, 200, 50, GRAY);
+                if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 30}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 70, 200, 50, LIME);
                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        dificuldade = 2;
-                        DrawRectangle(400, 420, 200, 50, GRAY);
-                        strcpy(dificuldade_selecionada, "Dificil");
-                        //DrawText(TextFormat("Dificuldade: %s", dificuldade_selecionada), 400, 200, 40, BLACK);
+                        dificuldade = 2; // Se mouse for apertado, a dificuldade mudara para médio 
+                        DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 70, 200, 50, LIME);
+                        strcpy(dificuldade_selecionada, "Dificil"); // Copia "Dificil" para a string de display do menu
                    }
                 }
                 else {
-                    DrawRectangle(400, 420, 200, 50, LIGHTGRAY);
+                    DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 70, 200, 50, GREEN);
                     }
-                    DrawText("Dificil", 450, 435, 20, BLACK);
+                    DrawText("Dificil", LARGURA_TELA/2 - 50, ALTURA_TELA/2 + 85, 20, WHITE);
                 
                 //Botao voltar
-                if (MouseEstaSobreBotao((Vector2){400, 480}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 480, 200, 50, GRAY);
+                if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 110}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 150, 200, 50, LIME);
                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        tela_atual = MENU;
+                        tela_atual = MENU; // volta parar o menu
                    }
                 }
                 else {
-                    DrawRectangle(400, 480, 200, 50, LIGHTGRAY);
+                    DrawRectangle(LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 150, 200, 50, GREEN);
                     }
-                    DrawText("Voltar", 450, 495, 20, BLACK);
+                    DrawText("Voltar", LARGURA_TELA/2 - 50, ALTURA_TELA/2 + 165, 20, WHITE);
+                    
             } break;
             
             case RANKING: {
-                DrawText("Nome", LARGURA_TELA/4, 50, 50, BLACK);
-                DrawText("Score", 3*LARGURA_TELA/4, 50, 50, BLACK);
+                // Cabeçalhos
+                DrawText("Nome", LARGURA_TELA/4, 100, 50, BLACK);
+                DrawText("Score", 3*LARGURA_TELA/4, 100, 50, BLACK);
+                
+                // Loop iterando pelo array ranking para mostrar os nomes e scores
                 for (int i = 0; i < 5; i++) {
-                    DrawText(TextFormat("%s", ranking[i].name), LARGURA_TELA/4, 200 + i * 50, 30, BLACK);
-                    DrawText(TextFormat("%d", ranking[i].score), 3*LARGURA_TELA/4, 200 + i * 50, 30, BLACK);
+                    DrawText(TextFormat("%s", ranking[i].nome), LARGURA_TELA/4, 200 + i * 75, 30, BLACK);
+                    DrawText(TextFormat("%d", ranking[i].score), 3*LARGURA_TELA/4, 200 + i * 75, 30, BLACK);
                 }
                 // Botao voltar
-                if (MouseEstaSobreBotao((Vector2){400, 480}, (Vector2){200, 50})) {
-                   DrawRectangle(400, 480, 200, 50, GRAY);
+                if (MouseEstaSobreBotao((Vector2){LARGURA_TELA/2-100, ALTURA_TELA - 140}, (Vector2){200, 50})) {
+                   DrawRectangle(LARGURA_TELA/2-100, ALTURA_TELA - 100, 200, 50, LIME);
                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        tela_atual = MENU;
+                        tela_atual = MENU; // volta para o menu
                    }
                 }
                 else {
-                    DrawRectangle(400, 480, 200, 50, LIGHTGRAY);
+                    DrawRectangle(LARGURA_TELA/2-100, ALTURA_TELA - 100, 200, 50, GREEN);
                     }
-                    DrawText("Voltar", 450, 495, 20, BLACK);
+                    DrawText("Voltar", LARGURA_TELA/2-50, ALTURA_TELA - 85, 20, WHITE);
                 
             } break;
             
-            case GAMEPLAY: {
+            case GAMEPLAY: {   // Jogo em si
                 
-                DrawText(TextFormat("Score: %d", score), 10, 10, 20, LIGHTGRAY);
-
+                // Atualiza a posição do jogador
                 AtualizarJogador(&velocidade_jogador, aceleracao_jogador, &jogador, textura_passaro);
-                
+                // Aumenta a dificuldade quando o score passa o score_threshold. Os parametros sao dados pelos arquivos binarios lidos
                 AumentarDificuldade();
-                
-                //if(AtualizarJogo(obstaculos_baixo, obstaculos_cima, &jogador, &tela_atual, altura_inicial, ranking)){
-                    //AtualizarRanking(ranking, score, name);
                              
-
-                if (AtualizarJogo(obstaculos_baixo, obstaculos_cima, &jogador, &tela_atual, altura_inicial, ranking)){
-                    AtualizarRanking(ranking, name);
+                // AtualizarJogo atualiza os obstaculos e checa se houve colisao do jogador com os obstaculos ou se o jogador esta fora da
+                // tela. Retorna 1 se o jogo acabou.
+                if (AtualizarJogo(obstaculos_baixo, obstaculos_cima, &jogador, &tela_atual, altura_inicial, textura_cano, textura_cano_invertido)){
+                    // Se o jogo tiver acabado, atualiza o ranking, zera o score e o score temporario
+                    AtualizarRanking(ranking, nome);
                     score = 0;
                     score_var = 0;
                 }
+                // display do score
+                DrawText(TextFormat("Score: %d", score), 10, 50, 40, LIGHTGRAY);
 
             } break;
         }
         
         EndDrawing();
+       // DrawText(" ", 0, 0, 0, WHITE);  
     }
 
     CloseWindow();
