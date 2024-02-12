@@ -103,6 +103,18 @@ void DesenharInputBox(int *count_letras, char nome[]){
     DrawText(nome, BoxInputNome.x + 5, BoxInputNome.y + 45, 20, BLACK); // mostra o nome que está sendo digitado e armazenado na string nome
 }
 
+// Funcao move o background
+void AtualizarBackground(int *backgroundX, int backgroundScrollSpeed, Texture2D backgroundTexture){
+    
+    *backgroundX -= backgroundScrollSpeed;                           // Atualizar a posicao do background
+        
+    if (*backgroundX <= -backgroundTexture.width)                    // Resetar a parte do background quando ela sair da tela
+            *backgroundX = 0;
+            
+    DrawTexture(backgroundTexture, *backgroundX, 0, WHITE);
+    DrawTexture(backgroundTexture, *backgroundX + backgroundTexture.width, 0, WHITE);
+}
+
 // Função para ler o arquivo txt contendo o ranking
 void LerRanking(TIPO_SCORE ranking[5]){
     
@@ -364,15 +376,13 @@ int main() {
     int altura_inicial;                                       // Variavel inicial para armazenar o valor retornado por CarregarObstaculos
     char nome[MAX_INPUT_CHARS + 1] = "\0";                    // inicializa o array que ira armazenar o nome do jogador
     int count_letras = 0;                                     // contador de caracteres digitas no input do nome
-    float backgroundX = 0;                                    // posicao inicial do background
-    float backgroundScrollSpeed = 3.0;                        //velocidade do background
+    int backgroundX = 0;                                      // posicao inicial do background
+    int backgroundScrollSpeed = 3;                            //velocidade do background
     
     Jogador jogador = {(Vector2){100, 300}, 20};              // inicia o jogador em x=100, y=300 e tamanho (raio) = 20
     TIPO_SCORE ranking[5];                                    // inicializando o array de scores
     Obstaculo obstaculos_baixo[NUM_OBSTACULOS];               // cria o array que armazenará os obstaculos de baixo
     Obstaculo obstaculos_cima[NUM_OBSTACULOS];                // cria o array que armazenará os obstaculos de cima
-    
-    
         
     Image backgroundImage = LoadImage("resources/background.png");
     Texture2D backgroundTexture = LoadTextureFromImage(backgroundImage);                   // Carregando o background do jogo
@@ -397,13 +407,8 @@ int main() {
 
     while (!WindowShouldClose()) {
         BeginDrawing();
-
-        backgroundX -= backgroundScrollSpeed;                           // Atualizar a posicao do background
-        
-        if (backgroundX <= -backgroundTexture.width)                    // Resetar a parte do background quando ela sair da tela
-            backgroundX = 0;
-        DrawTexture(backgroundTexture, backgroundX, 0, WHITE);
-        DrawTexture(backgroundTexture, backgroundX + backgroundTexture.width, 0, WHITE);     
+    
+        AtualizarBackground(&backgroundX, backgroundScrollSpeed, backgroundTexture);
 
         switch (tela_atual) {
             
