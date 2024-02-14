@@ -222,13 +222,13 @@ void LerDificuldade(int dificuldade){
     
     switch (dificuldade){                                          // dificuldade padrao é 1 (médio)
         case 0: 
-            arq = fopen("facil.bin", "rb");
+            arq = fopen("resources/facil.bin", "rb");
             break;
         case 1:
-            arq = fopen("medio.bin", "rb");
+            arq = fopen("resources/medio.bin", "rb");
             break;
         case 2:
-            arq = fopen("dificil.bin", "rb");
+            arq = fopen("resources/dificil.bin", "rb");
             break;
     }
     
