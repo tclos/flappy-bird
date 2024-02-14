@@ -1,10 +1,10 @@
-Mexican Joker
-2300
-dfsdfs
-1800
-Comedor
-1600
-Tiago
-650
- jEREMY
-550
+player1
+0
+player2
+0
+player3
+0
+player4
+0
+player5
+0
