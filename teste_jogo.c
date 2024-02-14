@@ -403,7 +403,7 @@ int main() {
     UnloadImage(passaro);
         
     Image obstaculo = LoadImage("resources/obstaculo.png");
-    Texture2D textura_obs = LoadTextureFromImage(obstaculo);                               // Carregando a do obstac. inferior 
+    Texture2D textura_obs = LoadTextureFromImage(obstaculo);                               // Carregando a img do obstac. inferior 
     ImageFlipVertical(&obstaculo);                                                         // invertendo para obter o obst sup              
     Texture2D textura_obsinv = LoadTextureFromImage(obstaculo);
     UnloadImage(obstaculo);
