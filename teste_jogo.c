@@ -29,14 +29,15 @@ typedef struct tipo_score {
 
 
 float velocidade_jogador = 0, aceleracao_jogador = 0.5;           // velocidade e aceleracao com que o jogador cai
-int vel_obstaculos = 10, inc_vel_obstaculos = 1;                  // velocidade com que os obstaculos vao em direcao ao jogador
 int score = 0, score_var = 0;                                     // score_var temporario para fazer o calculo do incremento de dificuldade
-int gap = 300, dec_gap = 5;
 int largura_obstaculos = 100;
 int distanciaProximoObstaculo = 400;                              // distanciia entre os obstaculos
-int dif_max_altura = 50, inc_dif_max_altura;
-int score_threshold = 400;
 int dificuldade = 1;                                              // 0 - facil, 1 - medio, 2 - dificil, o jogo comeca no medio
+int vel_obstaculos; inc_vel_obstaculos;                           // velocidade com que os obstaculos vao em direcao ao jogador
+int gap, dec_gap;                                                 // distancia entre o obstaculo inferior e superior
+int dif_max_altura, inc_dif_max_altura;                           // diferenca maxima de altura entre dois obstaculos consecutivos
+int score_threshold;                                              // indica a cada quantos pontos a dificuldade é incrementada
+
 GameScreen tela_atual = MENU;                                     // Indica que o jogo comeca na tela do Menu
 
 // Funcao de inicializacao da janela, tamanho da janela, quadros por segundo e posição da janela
@@ -64,6 +65,7 @@ int DesenharBotao(int posicao_x, int posicao_y, char nome_botao[]){
     return 0;  
 }
 
+// Funcao desenha a caixa de entrada do input do nome do jogador
 void DesenharInputBox(int *count_letras, char nome[]){
     
     Rectangle BoxInputNome = { LARGURA_TELA-500, 10, 490, 25 };                     // inicialiazao do retangulo do input do username
@@ -136,7 +138,6 @@ void LerRanking(TIPO_SCORE ranking[5]){
                         break;
                     }
                 }
-
                 strcpy(ranking[i].nome, linha);                                          // copiando o nome no array de rankings 
                 
                 fscanf(arq, "%d", &ranking[i].score);                                    // Lendo as linhas com score
@@ -210,6 +211,7 @@ void EscreverRanking(TIPO_SCORE ranking[5]){
 
 // Funcao para verificar se o mouse esta em cima de um botao (retangulo), os argumentos passados são a posicao e tamanho do botao
 int MouseEstaSobreBotao(Vector2 posicao, Vector2 tamanho) {
+    
     Vector2 mouse = GetMousePosition();                                             // pega as coordenadas atuais do mouse
     return CheckCollisionPointRec(mouse, (Rectangle){posicao.x, posicao.y, tamanho.x, tamanho.y});
 }
@@ -244,32 +246,34 @@ void LerDificuldade(int dificuldade){
 }
 
 int CarregarObstaculos(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[]){
-    int altura_obstaculos = GetRandomValue(300, 700);//GetRandomValue(10, ALTURA_TELA - gap - 10);
+    
+    int altura_obstaculos = GetRandomValue(500, 700);                         // inicializa a altura dos objetos com valor random
 
     for (int i = 0; i < NUM_OBSTACULOS; i++) {
-        /////////////////////////////////////////////////////// FIX THIS
-        altura_obstaculos += GetRandomValue(-dif_max_altura, dif_max_altura);
         
-        if (altura_obstaculos >= ALTURA_TELA - gap - 100){
-            altura_obstaculos = ALTURA_TELA - gap - 100;//GetRandomValue(ALTURA_TELA - gap - dif_max_altura - 10, ALTURA_TELA - gap - 10);
-        }
-        else if (altura_obstaculos <= 50){
-            altura_obstaculos = 50;//GetRandomValue(10, altura_obstaculos + dif_max_altura);
-        }
-
-        obstaculos_cima[i].posicao.x = LARGURA_TELA + i * distanciaProximoObstaculo;
-        obstaculos_cima[i].posicao.y = 0;
-        obstaculos_cima[i].tamanho.x = largura_obstaculos;
+        altura_obstaculos += GetRandomValue(-dif_max_altura, dif_max_altura);  // incrementa/decrementa com valor no range de difmaxaltura
+        
+        // limitando a altura dos obstaculos
+        if (altura_obstaculos >= ALTURA_TELA - gap - 100)                      
+            altura_obstaculos = ALTURA_TELA - gap - 100;                       
+        else if (altura_obstaculos <= 50)
+            altura_obstaculos = 50;
+      
+        
+        obstaculos_cima[i].posicao.x = LARGURA_TELA + i * distanciaProximoObstaculo;   // Configurando a posição dos obstaculos de cima
+        obstaculos_cima[i].posicao.y = 0;                                                 
+        obstaculos_cima[i].tamanho.x = largura_obstaculos;                             // Configurando o tamanho dos obstaculos de cima
         obstaculos_cima[i].tamanho.y = ALTURA_TELA - altura_obstaculos - gap;
 
-        obstaculos_baixo[i].posicao.x = LARGURA_TELA + i * distanciaProximoObstaculo;
+        obstaculos_baixo[i].posicao.x = LARGURA_TELA + i * distanciaProximoObstaculo;  // Configurando a posição dos obstaculos de baixo
         obstaculos_baixo[i].posicao.y = ALTURA_TELA - altura_obstaculos;
-        obstaculos_baixo[i].tamanho.x = largura_obstaculos;
+        obstaculos_baixo[i].tamanho.x = largura_obstaculos;                            // Configurando o tamanho dos obstaculos de baixo
         obstaculos_baixo[i].tamanho.y = altura_obstaculos;
-        obstaculos_baixo[i].passou = 0;
+        
+        obstaculos_baixo[i].passou = 0;                                                // 'passou' registra se o jogador passou pelo obst.
     }
     
-    return altura_obstaculos;
+    return altura_obstaculos;                                                          // retorna altura gerada na ultima iteracao
 }
 
 // Funcao para atualizar a posicao e velocidade do jogador e para colocar a imagem do passaro no jogador
@@ -306,58 +310,64 @@ void AumentarDificuldade(){
     }  
 }
 
-int AtualizarJogo(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[], Jogador *jogador, GameScreen *currentScreen, int *altura_obstaculos, Texture2D textura_obs, Texture2D textura_obsinv){
+// Funcao para atualizar os obstaculos, incrementar o score e checar se deu gameover. Retorna 1 se deu gameover
+int AtualizarJogo(Obstaculo obstaculos_baixo[], Obstaculo obstaculos_cima[], Jogador *jogador, GameScreen *currentScreen,
+                  int *altura_obstaculos, Texture2D textura_obs, Texture2D textura_obsinv){
 
     for (int i = 0; i < NUM_OBSTACULOS; i++) {
         
-        obstaculos_cima[i].posicao.x -= vel_obstaculos;
+        obstaculos_cima[i].posicao.x -= vel_obstaculos;                          // Atualiza a posição dos obstaculos
         obstaculos_baixo[i].posicao.x -= vel_obstaculos;
 
-            // Check if obstacle passed the player and hasn't been scored yet
+        // Checa se o jogador passou de um obstaculo e incrementa o score
         if (obstaculos_baixo[i].posicao.x + largura_obstaculos < (*jogador).posicao.x && !obstaculos_baixo[i].passou) {
             score += 50;
             score_var += 50;
             obstaculos_baixo[i].passou = 1;
         }
         
-        /////////////////////////////////////////////////////// TODO
-
-        *altura_obstaculos += GetRandomValue(-dif_max_altura, dif_max_altura);
+        if (obstaculos_baixo[i].posicao.x + largura_obstaculos <= 0) {   // Checa se o obstaculo saiu da tela, reseta a posicao e 'passou'
+            
+            *altura_obstaculos += GetRandomValue(-dif_max_altura, dif_max_altura);     // calculando a nova altura dos obstaculos
         
-        if (*altura_obstaculos >= ALTURA_TELA - gap - 100){
-            *altura_obstaculos = ALTURA_TELA - gap - 100;
-        }
-        else if (*altura_obstaculos <= 50){
-            *altura_obstaculos = 50;
-        }
-        ///////////////////////////////////////////////////////
-
-        
-            // Check if obstacle went off the screen, reset its position and reset passou flag
-        if (obstaculos_baixo[i].posicao.x + largura_obstaculos <= 0) {
-            obstaculos_cima[i].posicao.x = LARGURA_TELA + distanciaProximoObstaculo - largura_obstaculos;
+            if (*altura_obstaculos >= ALTURA_TELA - gap - 100){
+                *altura_obstaculos = ALTURA_TELA - gap - 100;
+            }                                                                               // limitando a altura
+            else if (*altura_obstaculos <= 50){
+                *altura_obstaculos = 50;
+            }
+            
+            obstaculos_cima[i].posicao.x = LARGURA_TELA + distanciaProximoObstaculo - largura_obstaculos;    // Reseta a posicao dos obst
             obstaculos_cima[i].posicao.y = 0;
-            obstaculos_cima[i].tamanho.y = ALTURA_TELA - *altura_obstaculos - gap;//altura_obstaculos - gap / 2;
+            obstaculos_cima[i].tamanho.y = ALTURA_TELA - *altura_obstaculos - gap;
 
             obstaculos_baixo[i].posicao.x = LARGURA_TELA + distanciaProximoObstaculo - largura_obstaculos;
-            obstaculos_baixo[i].posicao.y = ALTURA_TELA - *altura_obstaculos;//altura_obstaculos + gap;
-            obstaculos_baixo[i].tamanho.y = *altura_obstaculos;//ALTURA_TELA - altura_obstaculos - gap;
-
-            obstaculos_baixo[i].passou = 0;
-        }
+            obstaculos_baixo[i].posicao.y = ALTURA_TELA - *altura_obstaculos;
+            obstaculos_baixo[i].tamanho.y = *altura_obstaculos;
             
-        if (CheckCollisionCircleRec((*jogador).posicao, (*jogador).tamanho, (Rectangle){obstaculos_baixo[i].posicao.x, obstaculos_baixo[i].posicao.y, obstaculos_baixo[i].tamanho.x, obstaculos_baixo[i].tamanho.y}) ||
-            CheckCollisionCircleRec((*jogador).posicao, (*jogador).tamanho, (Rectangle){obstaculos_cima[i].posicao.x, obstaculos_cima[i].posicao.y, obstaculos_cima[i].tamanho.x, obstaculos_cima[i].tamanho.y})) {
-            DrawText(TextFormat("Collision!"), 500, 500, 40, BLACK); 
+            obstaculos_baixo[i].passou = 0;                                             // reseta a flag
+        }
+        
+        // Checa se o jogador bateu no obstaculo inferior.
+        if (CheckCollisionCircleRec((*jogador).posicao, (*jogador).tamanho, (Rectangle){obstaculos_baixo[i].posicao.x, obstaculos_baixo[i].posicao.y, obstaculos_baixo[i].tamanho.x, obstaculos_baixo[i].tamanho.y})) {
+
             tela_atual = MENU;
             return 1;
         }
         
-        if((*jogador).posicao.y >= ALTURA_TELA){
+        // Checa se o jogador bateu no obstaculo superior
+        if (CheckCollisionCircleRec((*jogador).posicao, (*jogador).tamanho, (Rectangle){obstaculos_cima[i].posicao.x, obstaculos_cima[i].posicao.y, obstaculos_cima[i].tamanho.x, obstaculos_cima[i].tamanho.y})){
+            
             tela_atual = MENU;
             return 1;
         }
-
+        
+        if((*jogador).posicao.y >= ALTURA_TELA){             // Checa se o jogador está fora do alcance inferior da tela             
+            tela_atual = MENU;
+            return 1;
+        }
+        
+        // Desenhando os obstaculos inferiores e superiores e colocando a textura neles
         DrawRectangleV(obstaculos_cima[i].posicao, obstaculos_cima[i].tamanho, BLANK);
         DrawTexture(textura_obsinv, obstaculos_cima[i].posicao.x, obstaculos_cima[i].tamanho.y - ALTURA_TELA+100, WHITE);
         DrawRectangleV(obstaculos_baixo[i].posicao, obstaculos_baixo[i].tamanho, BLANK);  
@@ -417,6 +427,7 @@ int main() {
             
                 // Botao Jogar
                 if(DesenharBotao(LARGURA_TELA/2 - 100, ALTURA_TELA/2-50, "Jogar")){
+                    
                     jogador.posicao.y = 300;                                        // reseta a posicao do jogador
                     velocidade_jogador = 0;                                         // reseta a velocidade
                     LerDificuldade(dificuldade);                                    // Lê o arquivo bin conforme a dificuldade selecionada
@@ -492,16 +503,15 @@ int main() {
                 
             } break;
             
-            case GAMEPLAY: {                                 // Jogo em si
+            case GAMEPLAY: {   // Jogo
                 
                 AtualizarJogador(&velocidade_jogador, aceleracao_jogador, &jogador, textura_passaro); // Atualiza a posição do jogador
-                // Aumenta a dificuldade quando o score passa o score_threshold. Os parametros sao dados pelos arquivos binarios lidos
-                AumentarDificuldade();
+                
+                AumentarDificuldade();                                   // Aumenta a dificuldade quando o score passa o score_threshold.
                              
                 // AtualizarJogo atualiza os obstaculos e checa se o jogador colidiu com os obstaculos ou se o jogador esta fora da tela.
-                // Retorna 1 se o jogo acabou.
                 if (AtualizarJogo(obstaculos_baixo, obstaculos_cima, &jogador, &tela_atual, &altura_inicial, textura_obs, textura_obsinv)){
-                    
+                // Retorna 1 se o jogo acabou.
                     AtualizarRanking(ranking, nome); 
                     score = 0;                           // Se o jogo tiver acabado, atualiza o ranking, zera o score e o score temporario
                     score_var = 0;
